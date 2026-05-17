@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antibot Global Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 40px 20px; }
+        .container { max-width: 550px; margin: auto; background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+        h1 { color: #ff4757; margin-bottom: 5px; }
+        p { color: #a4b0be; font-size: 14px; }
+        .btn { display: block; width: 100%; padding: 14px; margin: 12px 0; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; text-decoration: none; font-weight: bold; box-sizing: border-box; text-align: center; }
+        .btn-google { background: #4285F4; color: white; }
+        .btn-google:hover { background: #357ae8; }
+        .btn-danger { background: #ff4757; color: white; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; }
+        .btn-danger:hover { background: #e0404f; }
+        .bot-item { background: #2f3542; padding: 12px; margin: 8px 0; border-radius: 6px; text-align: left; display: flex; justify-content: space-between; align-items: center; border: 1px solid #3f4451; }
+        .nascosto { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛡️ @antibot-global</h1>
+    <p>Piattaforma Sicura di Moderazione Antispam</p>
+    <hr style="border-color: #333; margin: 20px 0;">
+
+    <div id="sezione-login">
+        <h3>Autenticazione Richiesta</h3>
+        <p>Per evitare che i bot cattivi cancellino le segnalazioni altrui, devi dimostrare la tua identità reale tramite YouTube.</p>
+        <a href="/api/login" class="btn btn-google">ACCEDI CON YOUTUBE</a>
+    </div>
+
+    <div id="sezione-dashboard" class="nascosto">
+        <h3>Bentornato, <span id="nome-utente" style="color: #2ed573;"></span>!</h3>
+        <p>Ecco l'elenco dei bot che hai segnalato. Clicca per revocare il tuo voto se hai fatto un errore.</p>
+        
+        <div id="lista-segnalazioni" style="margin-top: 20px;">
+            </div>
+    </div>
+</div>
+
+<script>
+    // Legge i dati sicuri dall'URL rimandato da Vercel dopo il login
+    const parametriUrl = new URLSearchParams(window.location.search);
+    const utenteId = parametriUrl.get('id');
+    const utenteNome = parametriUrl.get('nome');
+
+    if (utenteId && utenteNome) {
+        // Nasconde il login e mostra la dashboard personalizzata
+        document.getElementById("sezione-login").classList.add("nascosto");
+        document.getElementById("sezione-dashboard").classList.remove("nascosto");
+        document.getElementById("nome-utente").innerText = utenteNome;
+
+        // Carica la lista dei bot segnalati da questa persona
+        recuperaSegnalazioni(utenteId);
+    }
+
+    function recuperaSegnalazioni(id) {
+        // Chiama l'endpoint Python relativo su Vercel senza esporre domini esterni
+        fetch(`/api/mie-segnalazioni?id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+            const lista = document.getElementById("lista-segnalazioni");
+            lista.innerHTML = "";
+
+            if (!data.bot_segnalati || data.bot_segnalati.length === 0) {
+                lista.innerHTML = "<p style='color: #a4b0be; padding: 10px;'>Non hai effettuato segnalazioni attive nel database.</p>";
+                return;
+            }
+
+            data.bot_segnalati.forEach(bot => {
+                const elemento = document.createElement("div");
+                elemento.className = "bot-item";
+                elemento.innerHTML = `
+                    <span>🤖 <b>${bot.nome_bot}</b></span>
+                    <button class="btn-danger" onclick="revocaVoto('${id}', '${bot.id_bot}')">REVOCA</button>
+                `;
+                lista.appendChild(elemento);
+            });
+        });
+    }
+
+    function revocaVoto(idUtente, idBot) {
+        if (confirm("Vuoi rimuovere la tua segnalazione contro questo account?")) {
+            fetch("/api/cancella-segnalazione", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id_utente: idUtente, id_bot: idBot })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert("Segnalazione rimossa con successo. Counter aggiornato.");
+                recuperaSegnalazioni(idUtente); // Ricarica la lista aggiornata
+            });
+        }
+    }
+</script>
+
+</body>
+</html>
